@@ -1,0 +1,5 @@
+homepage: "https://trustpilot.com"
+documentation: "https://github.com/newnorthdigital/trustpilot-web-tag/blob/main/README.md"
+versions:
+  - sha: REPLACE_WITH_COMMIT_SHA
+    changeNotes: "Initial release - TrustBox widget bootstrap and review invitation support."
