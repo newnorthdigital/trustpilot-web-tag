@@ -1,5 +1,7 @@
 homepage: "https://trustpilot.com"
 documentation: "https://github.com/newnorthdigital/trustpilot-web-tag/blob/main/README.md"
 versions:
+  - sha: e669147a35977bed4aa1428c14f911f0c7fe25f9
+    changeNotes: "Resize oversized thumbnail to canonical 96x96 PNG."
   - sha: faabbfe15281b39cc0ca20d13b69f4ff1c77de83
     changeNotes: "Initial release - TrustBox widget bootstrap and review invitation support."
