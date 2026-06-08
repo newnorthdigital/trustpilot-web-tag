@@ -13,7 +13,7 @@ ___INFO___
   "id": "cvt_temp_public_id",
   "version": 1,
   "securityGroups": [],
-  "displayName": "Trustpilot tag",
+  "displayName": "Trustpilot Tag by New North Digital",
   "categories": [
     "MARKETING",
     "CONVERSIONS"
