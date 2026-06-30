@@ -61,7 +61,7 @@ No configuration needed — the bootstrap script handles everything. Just ensure
 
 ## Author
 
-Created by [New North Digital](https://newnorth.digital?utm_source=github&utm_medium=gtm-template&utm_campaign=trustpilot-web-tag)
+Created and maintained by [Freek Kampen](https://freekkampen.com) at [New North Digital](https://newnorth.digital?utm_source=github&utm_medium=gtm-template&utm_campaign=trustpilot-web-tag)
 
 ## License
 
