@@ -1,6 +1,8 @@
 homepage: "https://trustpilot.com"
 documentation: "https://github.com/newnorthdigital/trustpilot-web-tag/blob/main/README.md"
 versions:
+  - sha: 06159552127d0fa8b2c1a44fcd49ee4c47d52cd3
+    changeNotes: 'NND-badge icon and shortened display name (by New North).'
   - sha: b73cc77858d8f3f38b152fb7fd6afdd6f4a4ad21
     changeNotes: "Rename displayName to 'Trustpilot Tag by New North Digital' per Gallery third-party naming rule (tag name by company)."
   - sha: e669147a35977bed4aa1428c14f911f0c7fe25f9
