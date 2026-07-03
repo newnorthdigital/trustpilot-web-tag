@@ -139,6 +139,33 @@ ___TEMPLATE_PARAMETERS___
   },
   {
     "type": "GROUP",
+    "name": "consentGroup",
+    "displayName": "Consent",
+    "groupStyle": "ZIPPY_OPEN",
+    "subParams": [
+      {
+        "type": "SELECT",
+        "name": "consentMode",
+        "displayName": "Consent handling",
+        "macrosInSelect": false,
+        "selectItems": [
+          {
+            "value": "auto",
+            "displayValue": "Follow GTM Consent Mode (analytics_storage)"
+          },
+          {
+            "value": "off",
+            "displayValue": "Fire immediately (I gate consent elsewhere)"
+          }
+        ],
+        "simpleValueType": true,
+        "defaultValue": "auto",
+        "help": "\"Follow GTM Consent Mode\" (recommended) fires only once analytics_storage is granted, and waits for consent if it is not yet given. \"Fire immediately\" runs right away, for when you gate consent with GTM's tag-level consent settings or a consent trigger. Consent that is never configured counts as granted, so sites without Consent Mode are unaffected."
+      }
+    ]
+  },
+  {
+    "type": "GROUP",
     "name": "debugging",
     "displayName": "Debugging",
     "groupStyle": "ZIPPY_CLOSED",
@@ -160,6 +187,8 @@ var log = require('logToConsole');
 var injectScript = require('injectScript');
 var createArgumentsQueue = require('createArgumentsQueue');
 var makeString = require('makeString');
+var isConsentGranted = require('isConsentGranted');
+var addConsentListener = require('addConsentListener');
 
 var enableDebug = data.debug;
 var debugLog = function(msg) {
@@ -168,79 +197,105 @@ var debugLog = function(msg) {
 
 var actionType = data.actionType;
 
-if (actionType === 'trustbox') {
-  // Load the TrustBox bootstrap script
-  // It auto-discovers all trustpilot-widget divs on the page
-  var bootstrapUrl = 'https://widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js';
+// Load the Trustpilot script / push the invitation. Guarded so it runs at most
+// once, even if the consent listener fires more than once.
+var hasFired = false;
+var fire = function() {
+  if (hasFired) return;
+  hasFired = true;
 
-  debugLog('Loading TrustBox bootstrap script');
+  if (actionType === 'trustbox') {
+    // Load the TrustBox bootstrap script
+    // It auto-discovers all trustpilot-widget divs on the page
+    var bootstrapUrl = 'https://widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js';
 
-  injectScript(bootstrapUrl, function() {
-    debugLog('TrustBox bootstrap loaded');
-    data.gtmOnSuccess();
-  }, function() {
-    debugLog('TrustBox bootstrap failed to load');
-    data.gtmOnFailure();
-  }, 'trustpilot-bootstrap');
+    debugLog('Loading TrustBox bootstrap script');
 
-} else if (actionType === 'invitation') {
-  // Review invitation - uses command queue pattern
-  var tp = createArgumentsQueue('tp', 'tp.q');
+    injectScript(bootstrapUrl, function() {
+      debugLog('TrustBox bootstrap loaded');
+      data.gtmOnSuccess();
+    }, function() {
+      debugLog('TrustBox bootstrap failed to load');
+      data.gtmOnFailure();
+    }, 'trustpilot-bootstrap');
 
-  // Register the integration
-  var integrationKey = makeString(data.integrationKey);
-  tp('register', integrationKey);
-  debugLog('Registered with integration key');
+  } else if (actionType === 'invitation') {
+    // Review invitation - uses command queue pattern
+    var tp = createArgumentsQueue('tp', 'tp.q');
 
-  // Build invitation data
-  var invitationData = {
-    recipientEmail: makeString(data.recipientEmail),
-    referenceId: makeString(data.referenceId),
-    source: 'InvitationScript'
-  };
+    // Register the integration
+    var integrationKey = makeString(data.integrationKey);
+    tp('register', integrationKey);
+    debugLog('Registered with integration key');
 
-  if (data.recipientName) {
-    invitationData.recipientName = makeString(data.recipientName);
-  }
+    // Build invitation data
+    var invitationData = {
+      recipientEmail: makeString(data.recipientEmail),
+      referenceId: makeString(data.referenceId),
+      source: 'InvitationScript'
+    };
 
-  // Handle product SKUs - split comma-separated string into array
-  if (data.productSkus) {
-    var skuString = makeString(data.productSkus);
-    var skus = skuString.split(',');
-    var trimmedSkus = [];
-    for (var i = 0; i < skus.length; i++) {
-      var sku = skus[i];
-      // Manual trim since .trim() may not be available
-      var s = 0;
-      var e = sku.length - 1;
-      while (s < sku.length && sku.charAt(s) === ' ') s++;
-      while (e > s && sku.charAt(e) === ' ') e--;
-      if (s <= e) trimmedSkus.push(sku.substring(s, e + 1));
+    if (data.recipientName) {
+      invitationData.recipientName = makeString(data.recipientName);
     }
-    if (trimmedSkus.length > 0) {
-      invitationData.productSkus = trimmedSkus;
+
+    // Handle product SKUs - split comma-separated string into array
+    if (data.productSkus) {
+      var skuString = makeString(data.productSkus);
+      var skus = skuString.split(',');
+      var trimmedSkus = [];
+      for (var i = 0; i < skus.length; i++) {
+        var sku = skus[i];
+        // Manual trim since .trim() may not be available
+        var s = 0;
+        var e = sku.length - 1;
+        while (s < sku.length && sku.charAt(s) === ' ') s++;
+        while (e > s && sku.charAt(e) === ' ') e--;
+        if (s <= e) trimmedSkus.push(sku.substring(s, e + 1));
+      }
+      if (trimmedSkus.length > 0) {
+        invitationData.productSkus = trimmedSkus;
+      }
     }
-  }
 
-  debugLog('Sending invitation for order: ' + invitationData.referenceId);
+    debugLog('Sending invitation for order: ' + invitationData.referenceId);
 
-  // Create the invitation
-  tp('createInvitation', invitationData);
+    // Create the invitation
+    tp('createInvitation', invitationData);
 
-  // Inject the invitation script
-  var inviteUrl = 'https://invitejs.trustpilot.com/tp.min.js';
+    // Inject the invitation script
+    var inviteUrl = 'https://invitejs.trustpilot.com/tp.min.js';
 
-  injectScript(inviteUrl, function() {
-    debugLog('Invitation script loaded');
-    data.gtmOnSuccess();
-  }, function() {
-    debugLog('Invitation script failed to load');
+    injectScript(inviteUrl, function() {
+      debugLog('Invitation script loaded');
+      data.gtmOnSuccess();
+    }, function() {
+      debugLog('Invitation script failed to load');
+      data.gtmOnFailure();
+    }, 'trustpilot-invite');
+
+  } else {
+    debugLog('Unknown action type');
     data.gtmOnFailure();
-  }, 'trustpilot-invite');
+  }
+};
 
+// Consent gate. Trustpilot's scripts read and write cookies for widget rendering
+// and review-invitation measurement, which requires analytics_storage. In the
+// default "auto" mode the tag follows GTM Consent Mode: it fires once
+// analytics_storage is granted and waits (via a consent listener) if it is not
+// yet. Choose "Fire immediately" to gate consent at the container level instead.
+// Note: isConsentGranted returns true when consent is not configured, so sites
+// without Consent Mode keep firing.
+var consentMode = data.consentMode || 'auto';
+
+if (consentMode === 'off' || isConsentGranted('analytics_storage')) {
+  fire();
 } else {
-  debugLog('Unknown action type');
-  data.gtmOnFailure();
+  debugLog('Waiting for analytics_storage consent');
+  addConsentListener('analytics_storage', function(consentType, granted) {
+    if (granted) fire();
+  });
 }
 
 
@@ -433,6 +488,58 @@ ___WEB_PERMISSIONS___
       "isEditedByUser": true
     },
     "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "access_consent"
+      },
+      "param": [
+        {
+          "key": "consentTypes",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "consentType"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "analytics_storage"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
   }
 ]
 
@@ -444,6 +551,7 @@ scenarios:
   code: |-
     var mockData = {
       actionType: 'trustbox',
+      consentMode: 'off',
       debug: true
     };
 
@@ -468,6 +576,7 @@ scenarios:
       recipientEmail: 'john@example.com',
       recipientName: 'John Doe',
       referenceId: 'ORD-001',
+      consentMode: 'off',
       debug: true
     };
 
@@ -498,6 +607,7 @@ scenarios:
       recipientName: 'Jane Smith',
       referenceId: 'ORD-002',
       productSkus: 'SKU-001, SKU-002, SKU-003',
+      consentMode: 'off',
       debug: true
     };
 
@@ -520,6 +630,7 @@ scenarios:
   code: |-
     var mockData = {
       actionType: 'trustbox',
+      consentMode: 'off',
       debug: true
     };
 
@@ -530,6 +641,82 @@ scenarios:
     runCode(mockData);
 
     assertApi('gtmOnFailure').wasCalled();
+- name: Consent - auto mode fires when analytics_storage is already granted
+  code: |-
+    var mockData = {
+      actionType: 'trustbox',
+      consentMode: 'auto',
+      debug: false
+    };
+
+    mock('isConsentGranted', function(type) { return true; });
+    mock('injectScript', function(url, onSuccess, onFailure, cacheToken) {
+      onSuccess();
+    });
+
+    runCode(mockData);
+
+    assertApi('injectScript').wasCalled();
+    assertApi('addConsentListener').wasNotCalled();
+    assertApi('gtmOnSuccess').wasCalled();
+- name: Consent - auto mode waits when analytics_storage is denied
+  code: |-
+    var mockData = {
+      actionType: 'trustbox',
+      consentMode: 'auto',
+      debug: false
+    };
+
+    mock('isConsentGranted', function(type) { return false; });
+    mock('addConsentListener', function(type, callback) {});
+    mock('injectScript', function(url, onSuccess, onFailure, cacheToken) {
+      onSuccess();
+    });
+
+    runCode(mockData);
+
+    assertApi('addConsentListener').wasCalled();
+    assertApi('injectScript').wasNotCalled();
+- name: Consent - fires once after analytics_storage is granted via the listener
+  code: |-
+    var mockData = {
+      actionType: 'trustbox',
+      consentMode: 'auto',
+      debug: false
+    };
+
+    mock('isConsentGranted', function(type) { return false; });
+    mock('addConsentListener', function(type, callback) {
+      callback(type, true);
+    });
+    var injectCount = 0;
+    mock('injectScript', function(url, onSuccess, onFailure, cacheToken) {
+      injectCount++;
+      onSuccess();
+    });
+
+    runCode(mockData);
+
+    assertThat(injectCount).isEqualTo(1);
+    assertApi('gtmOnSuccess').wasCalled();
+- name: Consent - fire immediately skips the consent check
+  code: |-
+    var mockData = {
+      actionType: 'trustbox',
+      consentMode: 'off',
+      debug: false
+    };
+
+    mock('isConsentGranted', function(type) { return false; });
+    mock('injectScript', function(url, onSuccess, onFailure, cacheToken) {
+      onSuccess();
+    });
+
+    runCode(mockData);
+
+    assertApi('injectScript').wasCalled();
+    assertApi('addConsentListener').wasNotCalled();
+    assertApi('gtmOnSuccess').wasCalled();
 
 
 ___NOTES___

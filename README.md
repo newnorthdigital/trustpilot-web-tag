@@ -7,6 +7,7 @@ A Google Tag Manager web tag template for [Trustpilot](https://www.trustpilot.co
 - **Load TrustBox Widgets** — Inject the Trustpilot bootstrap script that auto-discovers TrustBox widget divs on the page
 - **Send Review Invitations** — Trigger review invitation emails on the order confirmation page with customer and order data
 - **Product Reviews** — Include product SKUs to trigger product-specific review invitations
+- Built-in Consent Mode gate: follows GTM Consent Mode by default, firing only once `analytics_storage` is granted and waiting for consent otherwise.
 - **Debug Mode** — Console logging for troubleshooting
 
 ## Setup
@@ -47,10 +48,18 @@ No configuration needed — the bootstrap script handles everything. Just ensure
 | Order ID | Yes | Unique order/reference ID |
 | Product SKUs | No | Comma-separated SKUs for product reviews |
 
+## Consent
+
+The tag has a **Consent handling** field (under the Consent group):
+
+- **Follow GTM Consent Mode (analytics_storage)** (default, recommended) — the tag fires only once `analytics_storage` is granted. If consent has not been given yet, it waits and fires automatically when consent is granted. Consent that is never configured counts as granted, so sites without Consent Mode are unaffected.
+- **Fire immediately (I gate consent elsewhere)** — the tag runs right away, for when you gate consent with GTM's tag-level consent settings or a consent trigger instead.
+
 ## Permissions
 
 - **Inject Scripts** — Loads from `widget.trustpilot.com` and `invitejs.trustpilot.com`
 - **Access Global Variables** — Read/write `window.tp` for the invitation command queue
+- **Access Consent** — Reads `analytics_storage` to gate firing on consent
 - **Logging** — Console logging in debug/preview mode only
 
 ## Resources
