@@ -1,6 +1,8 @@
 homepage: "https://trustpilot.com"
 documentation: "https://github.com/newnorthdigital/trustpilot-web-tag/blob/main/README.md"
 versions:
+  - sha: df2478e0c2e10314f49360d4f8c20eac0e44bd99
+    changeNotes: 'Add built-in GTM Consent Mode gate: fires only once consent is granted, with a Fire-immediately option.'
   - sha: 06159552127d0fa8b2c1a44fcd49ee4c47d52cd3
     changeNotes: 'NND-badge icon and shortened display name (by New North).'
   - sha: b73cc77858d8f3f38b152fb7fd6afdd6f4a4ad21
